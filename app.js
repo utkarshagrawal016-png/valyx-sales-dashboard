@@ -41,9 +41,9 @@ async function loadDashboardData(reportDate) {
   const kpi = (rpcResult.kpi_metrics && rpcResult.kpi_metrics[0]) ? rpcResult.kpi_metrics[0] : {};
   renderKPICards(kpi);
 
-  // 2. Render Daily Leaderboard Table
+  // 2. Render Daily Leaderboard Table with Filters
   rawLeaderboardData = rpcResult.sales_rep_metrics || [];
-  renderLeaderboard(rawLeaderboardData);
+  filterLeaderboard();
 
   // 3. Render Top Destinations
   renderDestinations();
@@ -90,6 +90,35 @@ function renderKPICards(kpi) {
   document.getElementById('prevMonthRevenue').textContent = `₹${prevMonthRevK}K`;
 }
 
+function filterLeaderboard() {
+  const query = (document.getElementById('searchRep').value || '').toLowerCase().trim();
+  const sortMode = document.getElementById('sortLeaderboard').value || 'mtd_sales_desc';
+
+  // 1. Filter by Search Query
+  let filtered = rawLeaderboardData.filter(item => (item.sales_rep || '').toLowerCase().includes(query));
+
+  // 2. Sort based on dropdown option
+  filtered.sort((a, b) => {
+    const aMtdO = a.mtd_sales || 0;
+    const bMtdO = b.mtd_sales || 0;
+    const aMtdR = a.mtd_revenue || 0;
+    const bMtdR = b.mtd_revenue || 0;
+    const aTdyO = a.tdy_sales || 0;
+    const bTdyO = b.tdy_sales || 0;
+    const aArpu = aMtdO > 0 ? (aMtdR / aMtdO) : 0;
+    const bArpu = bMtdO > 0 ? (bMtdR / bMtdO) : 0;
+
+    if (sortMode === 'mtd_sales_desc') return bMtdO - aMtdO;
+    if (sortMode === 'mtd_rev_desc') return bMtdR - aMtdR;
+    if (sortMode === 'arpu_desc') return bArpu - aArpu;
+    if (sortMode === 'tdy_sales_desc') return bTdyO - aTdyO;
+    if (sortMode === 'name_asc') return (a.sales_rep || '').localeCompare(b.sales_rep || '');
+    return bMtdO - aMtdO;
+  });
+
+  renderLeaderboard(filtered);
+}
+
 function renderLeaderboard(data) {
   const tbody = document.getElementById('leaderboardBody');
   tbody.innerHTML = '';
@@ -98,17 +127,14 @@ function renderLeaderboard(data) {
     tbody.innerHTML = `
       <tr>
         <td colspan="8" class="empty-state-box">
-          No sales rep metrics found in Supabase get_sales_dashboard output.
+          No sales rep metrics found matching filter.
         </td>
       </tr>
     `;
     return;
   }
 
-  // Sort descending by MTD Sales
-  const sorted = [...data].sort((a, b) => (b.mtd_sales || 0) - (a.mtd_sales || 0));
-
-  sorted.forEach((row, index) => {
+  data.forEach((row, index) => {
     const tr = document.createElement('tr');
 
     const mtdSales = row.mtd_sales || 0;
@@ -149,12 +175,6 @@ function renderLeaderboard(data) {
     `;
     tbody.appendChild(tr);
   });
-}
-
-function filterLeaderboard() {
-  const query = document.getElementById('searchRep').value.toLowerCase().trim();
-  const filtered = rawLeaderboardData.filter(item => (item.sales_rep || '').toLowerCase().includes(query));
-  renderLeaderboard(filtered);
 }
 
 function renderDestinations() {

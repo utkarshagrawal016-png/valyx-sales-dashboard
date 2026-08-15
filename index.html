@@ -25,9 +25,11 @@
       </div>
 
       <div class="header-center">
-        <div class="date-pill">
-          <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--primary-orange);"></i>
-          <input type="date" id="reportDateInput" value="2026-05-17" onchange="onDateChange()" style="border: none; outline: none; background: transparent; font-family: inherit; font-weight: 700; color: #334155; cursor: pointer;">
+        <!-- DATE PICKER FILTER -->
+        <div class="date-pill" style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="calendar" style="width: 15px; height: 15px; color: var(--primary-orange);"></i>
+          <span style="font-size: 11px; font-weight: 700; color: #64748b;">DATE FILTER:</span>
+          <input type="date" id="reportDateInput" value="2026-05-17" onchange="onDateChange()" style="border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; outline: none; font-family: inherit; font-weight: 700; color: #0f172a; cursor: pointer; background: #ffffff;">
         </div>
 
         <nav class="nav-tabs">
@@ -48,9 +50,9 @@
       </div>
 
       <div class="header-right">
-        <div class="supabase-badge warning" id="connectionBadge">
+        <div class="supabase-badge connected" id="connectionBadge">
           <i data-lucide="database" style="width: 12px; height: 12px;"></i>
-          <span id="connectionBadgeText">Connecting to Supabase...</span>
+          <span id="connectionBadgeText">Supabase RPC Live Connected</span>
         </div>
 
         <div class="user-profile">
@@ -135,14 +137,31 @@
       <!-- MIDDLE SECTION (LEADERBOARD + TOP DESTINATIONS) -->
       <section class="middle-grid">
         
-        <!-- DAILY LEADERBOARD -->
+        <!-- DAILY LEADERBOARD WITH SEARCH & SORT FILTERS -->
         <div class="card-panel">
-          <div class="panel-header">
+          <div class="panel-header" style="flex-wrap: wrap; gap: 10px;">
             <div class="panel-title">
               <i data-lucide="list-ordered" style="width: 16px; height: 16px; color: var(--primary-orange);"></i>
               DAILY LEADERBOARD
             </div>
-            <input type="text" id="searchRep" placeholder="Search sales rep..." style="padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px;" oninput="filterLeaderboard()">
+
+            <!-- LEADERBOARD FILTERS CONTAINER -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <!-- SEARCH REP FILTER -->
+              <div style="position: relative;">
+                <input type="text" id="searchRep" placeholder="🔍 Search rep name..." style="padding: 6px 12px 6px 28px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 12px; width: 160px; outline: none;" oninput="filterLeaderboard()">
+                <i data-lucide="search" style="width: 12px; height: 12px; position: absolute; left: 10px; top: 10px; color: #94a3b8;"></i>
+              </div>
+
+              <!-- SORT FILTER DROPDOWN -->
+              <select id="sortLeaderboard" onchange="filterLeaderboard()" style="padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 12px; font-weight: 600; outline: none; background: #ffffff; cursor: pointer;">
+                <option value="mtd_sales_desc">Sort: MTD Sales (High to Low)</option>
+                <option value="mtd_rev_desc">Sort: MTD Revenue (High to Low)</option>
+                <option value="arpu_desc">Sort: ARPU (High to Low)</option>
+                <option value="tdy_sales_desc">Sort: Day Sales (High to Low)</option>
+                <option value="name_asc">Sort: Sales Rep Name (A-Z)</option>
+              </select>
+            </div>
           </div>
 
           <div class="table-wrapper">
@@ -161,7 +180,7 @@
               </thead>
               <tbody id="leaderboardBody">
                 <tr>
-                  <td colspan="8" class="empty-state-box">Fetching live data from Supabase RPC get_sales_dashboard...</td>
+                  <td colspan="8" class="empty-state-box">Loading leaderboard from Supabase RPC...</td>
                 </tr>
               </tbody>
             </table>
