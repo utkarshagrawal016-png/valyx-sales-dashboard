@@ -1,196 +1,234 @@
 -- ============================================================
--- VOYX DASHBOARD - COMPLETE SUPABASE DATABASE SETUP SCRIPT
--- Copy & Run this script in your Supabase SQL Editor:
--- https://supabase.com/dashboard/project/pcenxwfhavneypapwbxi/sql/new
+-- VALYX SALES DASHBOARD - SUPABASE DATABASE SETUP SCRIPT
 -- ============================================================
 
--- Enable UUID extension just in case
+-- Drop tables in order of dependencies if they exist
+DROP FUNCTION IF EXISTS public.get_sales_dashboard(DATE);
+DROP TABLE IF EXISTS public.orders CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE;
+DROP TABLE IF EXISTS public.products CASCADE;
+DROP TABLE IF EXISTS public.destinations CASCADE;
+DROP TABLE IF EXISTS public.wallet_summary CASCADE;
+
+-- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ------------------------------------------------------------
--- 1. TODAY PERFORMANCE TABLE
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.today_performance (
-    id SERIAL PRIMARY KEY,
-    orders INT NOT NULL DEFAULT 33,
-    revenue NUMERIC(10,2) NOT NULL DEFAULT 30.80,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- 1. USERS TABLE
+CREATE TABLE public.users (
+    user_id INT PRIMARY KEY,
+    name VARCHAR(255),
+    country_code VARCHAR(50),
+    mobile VARCHAR(50),
+    user_role INT,
+    created_datetime TIMESTAMP WITH TIME ZONE
 );
 
-ALTER TABLE public.today_performance ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow public select today_performance" ON public.today_performance;
-CREATE POLICY "Allow public select today_performance" ON public.today_performance FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Allow public insert today_performance" ON public.today_performance;
-CREATE POLICY "Allow public insert today_performance" ON public.today_performance FOR INSERT WITH CHECK (true);
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select users" ON public.users FOR SELECT USING (true);
 
-INSERT INTO public.today_performance (orders, revenue) VALUES (33, 30.80);
-
-
--- ------------------------------------------------------------
--- 2. STATS OVERVIEW TABLE (June MTD, Prev Month Same Day, Prev Month)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.stats_overview (
-    id VARCHAR(50) PRIMARY KEY,
-    title VARCHAR(100) NOT NULL,
-    count INT NOT NULL,
-    revenue NUMERIC(10,2) NOT NULL,
-    icon VARCHAR(50) DEFAULT 'bar-chart'
+-- 2. PRODUCTS TABLE
+CREATE TABLE public.products (
+    prod_id INT PRIMARY KEY,
+    add_on_id VARCHAR(255),
+    data_limit INT,
+    sim_mode INT,
+    fup_limit INT,
+    operator_id INT,
+    additional_note TEXT,
+    amount NUMERIC(10,2),
+    product_name VARCHAR(255),
+    post_fup_speed VARCHAR(50),
+    validity INT,
+    coverage_destinations TEXT,
+    allocated_destinations TEXT
 );
 
-ALTER TABLE public.stats_overview ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow public select stats_overview" ON public.stats_overview;
-CREATE POLICY "Allow public select stats_overview" ON public.stats_overview FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Allow public insert stats_overview" ON public.stats_overview;
-CREATE POLICY "Allow public insert stats_overview" ON public.stats_overview FOR INSERT WITH CHECK (true);
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select products" ON public.products FOR SELECT USING (true);
 
-INSERT INTO public.stats_overview (id, title, count, revenue, icon) VALUES
-('june_mtd', 'JUNE MTD', 658, 574.69, 'bar-chart-2'),
-('prev_month_sameday', 'PREV MONTH (SAME DAY)', 536, 459.44, 'history'),
-('prev_month', 'PREV MONTH', 964, 818.90, 'file-text')
-ON CONFLICT (id) DO UPDATE SET count = EXCLUDED.count, revenue = EXCLUDED.revenue;
-
-
--- ------------------------------------------------------------
--- 3. LEADERBOARD TABLE
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.leaderboard (
-    id SERIAL PRIMARY KEY,
-    rank INT NOT NULL,
-    sales_rep VARCHAR(100) NOT NULL,
-    day_orders INT DEFAULT 0,
-    day_rev NUMERIC(10,2) DEFAULT 0,
-    mtd_orders INT DEFAULT 0,
-    mtd_rev NUMERIC(10,2) DEFAULT 0,
-    arpu NUMERIC(10,2) DEFAULT 0,
-    target INT DEFAULT 125,
-    pv_month INT DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- 3. DESTINATIONS TABLE
+CREATE TABLE public.destinations (
+    destination_id VARCHAR(50) PRIMARY KEY,
+    destination_type INT,
+    destination_name VARCHAR(255),
+    flag_path TEXT,
+    included_destinations TEXT,
+    is_active BOOLEAN
 );
 
-ALTER TABLE public.leaderboard ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow public select leaderboard" ON public.leaderboard;
-CREATE POLICY "Allow public select leaderboard" ON public.leaderboard FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Allow public insert leaderboard" ON public.leaderboard;
-CREATE POLICY "Allow public insert leaderboard" ON public.leaderboard FOR INSERT WITH CHECK (true);
+ALTER TABLE public.destinations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select destinations" ON public.destinations FOR SELECT USING (true);
 
-INSERT INTO public.leaderboard (rank, sales_rep, day_orders, day_rev, mtd_orders, mtd_rev, arpu, target, pv_month) VALUES
-(1, 'Faizan', 10, 9.5, 155, 143.3, 924, 125, 84),
-(2, 'Talha', 4, 5.0, 121, 103.7, 857, 125, 44),
-(3, 'Bhageshri', 4, 2.5, 119, 94.0, 791, 125, 60),
-(4, 'Nidhi', 5, 4.2, 95, 78.8, 829, 125, 50),
-(5, 'Sanika', 5, 5.7, 95, 83.3, 877, 125, 54),
-(6, 'Prabhat', 3, 2.8, 64, 62.6, 979, 125, 75),
-(7, 'Farooq', 2, 1.1, 9, 9.0, 997, 125, 0);
-
-
--- ------------------------------------------------------------
--- 4. TOP DESTINATIONS TABLE
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.top_destinations (
-    id SERIAL PRIMARY KEY,
-    destination VARCHAR(150) NOT NULL,
-    bookings INT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- 4. ORDERS TABLE
+CREATE TABLE public.orders (
+    order_no INT PRIMARY KEY,
+    user_id INT REFERENCES public.users(user_id),
+    product_id INT REFERENCES public.products(prod_id),
+    amount NUMERIC(10,2),
+    discount_amount NUMERIC(10,2),
+    created_by INT REFERENCES public.users(user_id),
+    order_date_time TIMESTAMP WITH TIME ZONE
 );
 
-ALTER TABLE public.top_destinations ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow public select top_destinations" ON public.top_destinations;
-CREATE POLICY "Allow public select top_destinations" ON public.top_destinations FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Allow public insert top_destinations" ON public.top_destinations;
-CREATE POLICY "Allow public insert top_destinations" ON public.top_destinations FOR INSERT WITH CHECK (true);
-
-INSERT INTO public.top_destinations (destination, bookings) VALUES
-('Thailand [True]', 231),
-('Thailand', 206),
-('Singapore, Malaysia', 33),
-('Vietnam', 30),
-('Singapore, Malaysia, Thailand...', 17),
-('Japan', 15),
-('Singapore, Malaysia, Indonesia...', 10);
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select orders" ON public.orders FOR SELECT USING (true);
 
 
--- ------------------------------------------------------------
--- 5. DAILY SUMMARY TABLE
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.daily_summary (
-    id SERIAL PRIMARY KEY,
-    day_label VARCHAR(10) NOT NULL,
-    orders INT NOT NULL,
-    revenue NUMERIC(10,2) NOT NULL
-);
+-- 5. DEFINE RPC FUNCTION get_sales_dashboard
+CREATE OR REPLACE FUNCTION public.get_sales_dashboard(report_data DATE)
+RETURNS TABLE (
+    daily_metrics jsonb,
+    month_metrics jsonb,
+    kpi_metrics jsonb,
+    sales_rep_metrics jsonb,
+    destinations jsonb,
+    wallet_metrics jsonb
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    first_day_of_month DATE;
+    prev_month_start DATE;
+    prev_month_same_day DATE;
+    prev_month_end DATE;
+BEGIN
+    -- Derive target dates based on input report_data
+    first_day_of_month := date_trunc('month', report_data)::date;
+    prev_month_start := date_trunc('month', report_data - INTERVAL '1 month')::date;
+    prev_month_same_day := (report_data - INTERVAL '1 month')::date;
+    prev_month_end := (date_trunc('month', report_data) - INTERVAL '1 day')::date;
 
-ALTER TABLE public.daily_summary ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow public select daily_summary" ON public.daily_summary;
-CREATE POLICY "Allow public select daily_summary" ON public.daily_summary FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Allow public insert daily_summary" ON public.daily_summary;
-CREATE POLICY "Allow public insert daily_summary" ON public.daily_summary FOR INSERT WITH CHECK (true);
+    RETURN QUERY
+    SELECT 
+        -- daily_metrics: Daily orders/revenue count for the selected month of report_data
+        (
+            SELECT COALESCE(
+                jsonb_agg(
+                    jsonb_build_object(
+                        'order_date', to_char(d, 'YYYY-MM-DD'),
+                        'orders', COALESCE(ord.orders, 0),
+                        'revenue', COALESCE(ord.revenue, 0.00)
+                    )
+                    ORDER BY d
+                ),
+                '[]'::jsonb
+            )
+            FROM generate_series(first_day_of_month, (first_day_of_month + INTERVAL '1 month' - INTERVAL '1 day')::date, INTERVAL '1 day') d
+            LEFT JOIN (
+                SELECT order_date_time::date AS o_date, COUNT(*) AS orders, SUM(amount - discount_amount) AS revenue
+                FROM public.orders
+                GROUP BY order_date_time::date
+            ) ord ON ord.o_date = d::date
+        ) AS daily_metrics,
 
-INSERT INTO public.daily_summary (day_label, orders, revenue) VALUES
-('01-06', 36, 31.5),
-('02-06', 44, 38.2),
-('03-06', 35, 29.8),
-('04-06', 49, 42.0),
-('05-06', 30, 26.5),
-('06-06', 32, 28.0),
-('07-06', 58, 51.2),
-('08-06', 40, 34.8),
-('09-06', 38, 33.1),
-('10-06', 25, 21.0),
-('11-06', 41, 36.4),
-('12-06', 24, 20.8),
-('13-06', 27, 23.5),
-('14-06', 26, 22.9),
-('15-06', 54, 48.0),
-('16-06', 29, 25.1),
-('17-06', 30, 26.0),
-('18-06', 33, 30.8);
+        -- month_metrics: Monthly order trend aggregates across all available data
+        (
+            SELECT COALESCE(
+                jsonb_agg(
+                    jsonb_build_object(
+                        'month', sub.m,
+                        'year', sub.y,
+                        'orders', sub.orders,
+                        'revenue', sub.revenue
+                    )
+                    ORDER BY sub.y, sub.m
+                ),
+                '[]'::jsonb
+            )
+            FROM (
+                SELECT 
+                    EXTRACT(MONTH FROM order_date_time)::int AS m,
+                    EXTRACT(YEAR FROM order_date_time)::int AS y,
+                    COUNT(*) AS orders,
+                    SUM(amount - discount_amount) AS revenue
+                FROM public.orders
+                GROUP BY EXTRACT(YEAR FROM order_date_time)::int, EXTRACT(MONTH FROM order_date_time)::int
+            ) sub
+        ) AS month_metrics,
 
+        -- kpi_metrics: Main high-level summary cards (Today, Month-To-Date, Prev Month Same Day, and Prev Month Total)
+        (
+            SELECT jsonb_build_array(
+                jsonb_build_object(
+                    'today_sales', COALESCE(SUM(CASE WHEN order_date_time::date = report_data THEN 1 ELSE 0 END), 0),
+                    'today_revenue', COALESCE(SUM(CASE WHEN order_date_time::date = report_data THEN amount - discount_amount ELSE 0.00 END), 0.00),
+                    'mtd_sales', COALESCE(SUM(CASE WHEN order_date_time::date >= first_day_of_month AND order_date_time::date <= report_data THEN 1 ELSE 0 END), 0),
+                    'mtd_revenue', COALESCE(SUM(CASE WHEN order_date_time::date >= first_day_of_month AND order_date_time::date <= report_data THEN amount - discount_amount ELSE 0.00 END), 0.00),
+                    'prev_month_same_day_sales', COALESCE(SUM(CASE WHEN order_date_time::date >= prev_month_start AND order_date_time::date <= prev_month_same_day THEN 1 ELSE 0 END), 0),
+                    'prev_month_same_day_revenue', COALESCE(SUM(CASE WHEN order_date_time::date >= prev_month_start AND order_date_time::date <= prev_month_same_day THEN amount - discount_amount ELSE 0.00 END), 0.00),
+                    'prev_month_sales', COALESCE(SUM(CASE WHEN order_date_time::date >= prev_month_start AND order_date_time::date <= prev_month_end THEN 1 ELSE 0 END), 0),
+                    'prev_month_revenue', COALESCE(SUM(CASE WHEN order_date_time::date >= prev_month_start AND order_date_time::date <= prev_month_end THEN amount - discount_amount ELSE 0.00 END), 0.00)
+                )
+            )
+            FROM public.orders
+        ) AS kpi_metrics,
 
--- ------------------------------------------------------------
--- 6. MONTHLY SUMMARY TABLE
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.monthly_summary (
-    id SERIAL PRIMARY KEY,
-    month_label VARCHAR(15) NOT NULL,
-    orders INT NOT NULL,
-    revenue NUMERIC(10,2) NOT NULL
-);
+        -- sales_rep_metrics: Daily Leaderboard aggregated by agent (user_role = 2)
+        (
+            WITH rep_today AS (
+                SELECT created_by, COUNT(*) as tdy_sales, SUM(amount - discount_amount) as tdy_revenue
+                FROM public.orders
+                WHERE order_date_time::date = report_data
+                GROUP BY created_by
+            ),
+            rep_mtd AS (
+                SELECT created_by, COUNT(*) as mtd_sales, SUM(amount - discount_amount) as mtd_revenue
+                FROM public.orders
+                WHERE order_date_time::date >= first_day_of_month AND order_date_time::date <= report_data
+                GROUP BY created_by
+            ),
+            rep_prev AS (
+                SELECT created_by, COUNT(*) as pv_month
+                FROM public.orders
+                WHERE order_date_time::date >= prev_month_start AND order_date_time::date <= prev_month_end
+                GROUP BY created_by
+            )
+            SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                'sales_rep', COALESCE(NULLIF(TRIM(u.name), ''), 'Rep #' || u.user_id::text),
+                'tdy_sales', COALESCE(rt.tdy_sales, 0),
+                'tdy_revenue', COALESCE(rt.tdy_revenue, 0.00),
+                'mtd_sales', COALESCE(rm.mtd_sales, 0),
+                'mtd_revenue', COALESCE(rm.mtd_revenue, 0.00)
+            ) ORDER BY COALESCE(rm.mtd_sales, 0) DESC), '[]'::jsonb)
+            FROM public.users u
+            LEFT JOIN rep_today rt ON u.user_id = rt.created_by
+            LEFT JOIN rep_mtd rm ON u.user_id = rm.created_by
+            LEFT JOIN rep_prev rp ON u.user_id = rp.created_by
+            WHERE u.user_role = 2
+              AND (rt.tdy_sales IS NOT NULL OR rm.mtd_sales IS NOT NULL OR rp.pv_month IS NOT NULL)
+        ) AS sales_rep_metrics,
 
-ALTER TABLE public.monthly_summary ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow public select monthly_summary" ON public.monthly_summary;
-CREATE POLICY "Allow public select monthly_summary" ON public.monthly_summary FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Allow public insert monthly_summary" ON public.monthly_summary;
-CREATE POLICY "Allow public insert monthly_summary" ON public.monthly_summary FOR INSERT WITH CHECK (true);
+        -- destinations: Bookings mapped dynamic from actual products.coverageDestinations
+        (
+            SELECT COALESCE(jsonb_agg(jsonb_build_object('destination', sub.destination_name, 'bookings', sub.bookings)), '[]'::jsonb)
+            FROM (
+                SELECT d.destination_name, COUNT(*) AS bookings
+                FROM public.orders o
+                JOIN public.products p ON o.product_id = p.prod_id
+                CROSS JOIN LATERAL regexp_split_to_table(p.coverage_destinations, ',') AS dest_id
+                JOIN public.destinations d ON TRIM(dest_id) = d.destination_id
+                WHERE o.order_date_time::date <= report_data
+                GROUP BY d.destination_name
+                ORDER BY bookings DESC
+                LIMIT 10
+            ) sub
+        ) AS destinations,
 
-INSERT INTO public.monthly_summary (month_label, orders, revenue) VALUES
-('Nov 25', 45, 38.5),
-('Dec 25', 180, 155.0),
-('Jan 26', 320, 275.4),
-('Feb 26', 410, 360.0),
-('Mar 26', 530, 465.8),
-('Apr 26', 680, 595.0),
-('May 26', 964, 818.9),
-('Jun 26', 658, 574.69);
+        -- wallet_metrics: Explicitly documented zero-derived values (real wallet data is unavailable in CSV)
+        (
+            SELECT jsonb_build_object(
+                'account_balance', 0.00,
+                'pending_payouts', 0.00,
+                'total_withdrawn', 0.00
+            )
+        ) AS wallet_metrics;
+END;
+$$;
 
-
--- ------------------------------------------------------------
--- 7. WALLET SUMMARY TABLE
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.wallet_summary (
-    id SERIAL PRIMARY KEY,
-    account_balance NUMERIC(12,2) NOT NULL,
-    pending_payouts NUMERIC(12,2) NOT NULL,
-    total_withdrawn NUMERIC(12,2) NOT NULL
-);
-
-ALTER TABLE public.wallet_summary ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow public select wallet_summary" ON public.wallet_summary;
-CREATE POLICY "Allow public select wallet_summary" ON public.wallet_summary FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Allow public insert wallet_summary" ON public.wallet_summary;
-CREATE POLICY "Allow public insert wallet_summary" ON public.wallet_summary FOR INSERT WITH CHECK (true);
-
-INSERT INTO public.wallet_summary (account_balance, pending_payouts, total_withdrawn) VALUES
-(248950.00, 32450.00, 1850000.00);
+-- Grant execute permission to anon and authenticated users
+GRANT EXECUTE ON FUNCTION public.get_sales_dashboard(DATE) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_sales_dashboard(DATE) TO authenticated;
 
 -- Notify schema reload
 NOTIFY pgrst, 'reload schema';

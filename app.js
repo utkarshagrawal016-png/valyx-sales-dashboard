@@ -1,4 +1,4 @@
-// Voyx Dashboard Main Application Logic
+// VALYX Sales & Analytics Dashboard - Main Application Logic
 // Directly integrated with Supabase RPC function: get_sales_dashboard(report_data DATE)
 
 let rawLeaderboardData = [];
@@ -25,11 +25,11 @@ async function loadDashboardData(reportDate) {
   }
 
   // Check Connection Status
-  const connStatus = await VoyxDataService.checkSupabaseConnection();
+  const connStatus = await VALYXDataService.checkSupabaseConnection();
   updateConnectionBadge(connStatus);
 
   // Fetch RPC data from Supabase
-  const rpcResult = await VoyxDataService.fetchSalesDashboardRPC(reportDate);
+  const rpcResult = await VALYXDataService.fetchSalesDashboardRPC(reportDate);
 
   if (!rpcResult) {
     console.error("No data received from Supabase RPC get_sales_dashboard");
@@ -45,14 +45,18 @@ async function loadDashboardData(reportDate) {
   rawLeaderboardData = rpcResult.sales_rep_metrics || [];
   filterLeaderboard();
 
-  // 3. Render Top Destinations
-  renderDestinations();
+  // 3. Render Top Destinations (Dynamic)
+  renderDestinations(rpcResult.destinations || []);
 
   // 4. Render Daily Summary Chart
   renderDailyChart(rpcResult.daily_metrics || []);
 
   // 5. Render Monthly Summary Chart
   renderMonthlyChart(rpcResult.month_metrics || []);
+
+  // 6. Render Wallet Summary (Dynamic)
+  const wallet = rpcResult.wallet_metrics || {};
+  renderWalletSummary(wallet);
 }
 
 function updateConnectionBadge(status) {
@@ -90,14 +94,15 @@ function renderKPICards(kpi) {
   document.getElementById('prevMonthRevenue').textContent = `₹${prevMonthRevK}K`;
 }
 
+// Get sales data for the selected date and filter leaderboard
 function filterLeaderboard() {
   const query = (document.getElementById('searchRep').value || '').toLowerCase().trim();
   const sortMode = document.getElementById('sortLeaderboard').value || 'mtd_sales_desc';
 
-  // 1. Filter by Search Query
+  // Filter by Search Query
   let filtered = rawLeaderboardData.filter(item => (item.sales_rep || '').toLowerCase().includes(query));
 
-  // 2. Sort based on dropdown option
+  // Sort based on dropdown option
   filtered.sort((a, b) => {
     const aMtdO = a.mtd_sales || 0;
     const bMtdO = b.mtd_sales || 0;
@@ -177,19 +182,18 @@ function renderLeaderboard(data) {
   });
 }
 
-function renderDestinations() {
-  const destinations = [
-    { destination: 'Thailand [True]', bookings: 231 },
-    { destination: 'Thailand', bookings: 206 },
-    { destination: 'Singapore, Malaysia', bookings: 33 },
-    { destination: 'Vietnam', bookings: 30 },
-    { destination: 'Singapore, Malaysia, Thailand...', bookings: 17 },
-    { destination: 'Japan', bookings: 15 },
-    { destination: 'Singapore, Malaysia, Indonesia...', bookings: 10 }
-  ];
-
+function renderDestinations(destinations) {
   const container = document.getElementById('destinationsList');
   container.innerHTML = '';
+
+  if (!destinations || destinations.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state-box" style="color: #94a3b8;">
+        No bookings found.
+      </div>
+    `;
+    return;
+  }
 
   destinations.forEach(item => {
     const div = document.createElement('div');
@@ -200,6 +204,29 @@ function renderDestinations() {
     `;
     container.appendChild(div);
   });
+}
+
+function renderWalletSummary(wallet) {
+  // Use zero-derived values as we have no real wallet data in the CSV
+  const balance = (wallet.account_balance !== undefined && wallet.account_balance !== null) ? Number(wallet.account_balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+  const pending = (wallet.pending_payouts !== undefined && wallet.pending_payouts !== null) ? Number(wallet.pending_payouts).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+  const withdrawn = (wallet.total_withdrawn !== undefined && wallet.total_withdrawn !== null) ? Number(wallet.total_withdrawn).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+
+  document.getElementById('walletBalance').textContent = `₹${balance}`;
+  document.getElementById('walletPending').textContent = `₹${pending}`;
+  document.getElementById('walletWithdrawn').textContent = `₹${withdrawn}`;
+
+  // Populate transaction table with a descriptive note
+  const transactionBody = document.querySelector('#walletView tbody');
+  if (transactionBody) {
+    transactionBody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align: center; color: #94a3b8; padding: 25px; font-style: italic;">
+          No transactions found (Wallet functions disabled for this dataset)
+        </td>
+      </tr>
+    `;
+  }
 }
 
 function renderDailyChart(dailyMetrics) {
@@ -343,7 +370,7 @@ function downloadCSV() {
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `Voyx_Leaderboard_${new Date().toISOString().slice(0,10)}.csv`);
+  link.setAttribute("download", `VALYX_Leaderboard_${new Date().toISOString().slice(0,10)}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
